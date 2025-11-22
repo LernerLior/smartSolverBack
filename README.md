@@ -1,4 +1,4 @@
-# SmartSolver
+# SmartSolverBack
 > Desenvolvido durante as aulas de Projetos de Engenhaira da Computação I do curso de Engenharia da Computação da Universidade Presbiteriana Mackenzie.
 
 ## Descrição
