@@ -6,6 +6,7 @@ import os
 from azure.cosmos import CosmosClient
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+from complaint_catgories import categorize_complaints
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -40,7 +41,7 @@ app.add_middleware(
 def run_main():
     try:
         data = collect_complaints("santander", complaint_number=6, wait_seconds=10)
-        
+        data = categorize_complaints(data, ["Cobrança Indevida", "Problemas de Pagamento", "Conta Bloqueada", "Resgate de Investimento Não Realizado", "Outros"])
         if isinstance(data, list):
             for item in data:
                 container.upsert_item(item)
