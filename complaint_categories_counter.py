@@ -11,7 +11,6 @@ def categories_counter(lista):
 	categorias = contar(lista)
 	
 	categorias = list(categorias)
-	print(categorias)
 
 	for categoria in categorias:
 		quantidade_categorias[categoria] = 0
