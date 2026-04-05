@@ -6,7 +6,7 @@ import os
 from azure.cosmos import CosmosClient
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from complaint_catgories import categorize_complaints
+# from complaint_catgories import categorize_complaints
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -41,7 +41,7 @@ app.add_middleware(
 def run_main():
     try:
         data = collect_complaints("santander", complaint_number=6, wait_seconds=10)
-        data = categorize_complaints(data, ["Cobrança Indevida", "Problemas de Pagamento", "Conta Bloqueada", "Resgate de Investimento Não Realizado", "Outros"])
+        # data = categorize_complaints(data, ["Cobrança Indevida", "Problemas de Pagamento", "Conta Bloqueada", "Resgate de Investimento Não Realizado", "Outros"])
         if isinstance(data, list):
             for item in data:
                 container.upsert_item(item)
@@ -82,18 +82,20 @@ def get_latest(n: int = 6):
 @app.get("/categories")
 def get_categories():
     query = """
-    SELECT 
-        c.complaint_category AS category,
-        COUNT(1) AS total
+    SELECT c.complaint_category AS category
     FROM c
-    GROUP BY c.complaint_category
     """
 
     items = list(container.query_items(
         query=query,
         enable_cross_partition_query=True
     ))
+    
+    counts = {}
+    for item in items:
+        cat = item.get("category")
+        counts[cat] = counts.get(cat, 0) + 1
 
-    return items
+    return [{"category": k, "total": v} for k, v in counts.items()]
     
 #For testing: uvicorn server:app --reload --host 0.0.0.0 --port 8000
