@@ -79,6 +79,21 @@ def get_latest(n: int = 6):
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
+@app.get("/categories")
+def get_categories():
+    query = """
+    SELECT 
+        c.complaint_category AS category,
+        COUNT(1) AS total
+    FROM c
+    GROUP BY c.complaint_category
+    """
 
+    items = list(container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+
+    return items
     
 #For testing: uvicorn server:app --reload --host 0.0.0.0 --port 8000
