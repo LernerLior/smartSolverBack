@@ -9,10 +9,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 
-#Simulação de comportamento humano
 def human_sleep(min_s: float = 1.0, max_s: float = 3.0):
     time.sleep(random.uniform(min_s, max_s))
-
 
 def human_scroll(driver):
     total_height = driver.execute_script("return document.body.scrollHeight")
@@ -27,7 +25,6 @@ def human_scroll(driver):
     driver.execute_script(f"window.scrollTo(0, {current - random.randint(100, 300)});")
     human_sleep(0.5, 1.2)
 
-#ABre a página da empresa e retorna o driver para interação
 def open_company_page(target_company: str):
     chrome_options = Options()
     chrome_options.add_argument("--start-maximized")
@@ -52,8 +49,6 @@ def open_company_page(target_company: str):
 
     return driver
 
-#Coleta os dados de uma reclamação a partir da página individual
-
 def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
     data = {}
     try:
@@ -65,8 +60,16 @@ def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
         human_scroll(driver)
 
         try:
-            date_elem = driver.find_element(By.CSS_SELECTOR, "span[data-testid='complaint-creation-date']")
-            data['complaint-creation-date'] = date_elem.text
+            date_container = driver.find_element(
+                By.XPATH, "//p[.//*[contains(@class,'lucide-calendar')]]"
+            )
+            data['complaint-creation-date'] = driver.execute_script("""
+                return Array.from(arguments[0].childNodes)
+                    .filter(n => n.nodeType === Node.TEXT_NODE)
+                    .map(n => n.textContent.trim())
+                    .filter(t => t.length > 0)
+                    .join('');
+            """, date_container)
         except:
             data['complaint-creation-date'] = None
 
@@ -81,37 +84,28 @@ def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
 
     return data
 
-#Padrão de seleção dos títulos das reclamações na página de listagem
-H4_SELECTOR = "h4[data-testid='compain-title-link']"
+COMPLAINT_LINK_SELECTOR = "a[data-testid='complaint-listagem-v2-title-link']"
 
-
-#Abre cada reclamação em nova aba, coleta os dados e fecha a aba, retornando uma lista de reclamações
-def open_h4_and_collect(driver, n: int = 1, wait_seconds: int = 10):
+def open_and_collect(driver, n: int = 1, wait_seconds: int = 10):
     complaints_list = []
     main_tab = driver.current_window_handle
 
     WebDriverWait(driver, wait_seconds).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, H4_SELECTOR))
+        EC.presence_of_element_located((By.CSS_SELECTOR, COMPLAINT_LINK_SELECTOR))
     )
     human_scroll(driver)
 
     for i in range(n):
         try:
-            h4_elements = WebDriverWait(driver, wait_seconds).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, H4_SELECTOR))
+            link_elements = WebDriverWait(driver, wait_seconds).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, COMPLAINT_LINK_SELECTOR))
             )
 
-            if i >= len(h4_elements):
-                print(f"Apenas {len(h4_elements)} reclamações encontradas na página.")
+            if i >= len(link_elements):
+                print(f"Apenas {len(link_elements)} reclamações encontradas na página.")
                 break
 
-            # Tenta pegar o href do <a> , que é o botão de cada reclamação
-            try:
-                link_elem = h4_elements[i].find_element(By.XPATH, "ancestor::a")
-            except:
-                link_elem = None
-
-            href = link_elem.get_attribute("href") if link_elem else h4_elements[i].get_attribute("href")
+            href = link_elements[i].get_attribute("href")
 
             if not href:
                 print(f"[{i+1}/{n}] href não encontrado, pulando.")
@@ -119,12 +113,10 @@ def open_h4_and_collect(driver, n: int = 1, wait_seconds: int = 10):
 
             human_sleep(1.0, 2.5)
 
-            # Abre nova aba com a reclamação
             driver.execute_script(f"window.open('{href}', '_blank');")
             new_tab = [t for t in driver.window_handles if t != main_tab][0]
             driver.switch_to.window(new_tab)
 
-            # Lê a reclamação
             human_sleep(2.0, 4.0)
             complaint_data = get_complaint_data(driver, wait_seconds=wait_seconds)
 
@@ -133,7 +125,6 @@ def open_h4_and_collect(driver, n: int = 1, wait_seconds: int = 10):
                 complaints_list.append(complaint_data)
                 print(f"[{i+1}/{n}] Coletado: {complaint_data.get('complaint-title', 'sem título')}")
 
-            # Fecha nova aba e volta 
             driver.close()
             driver.switch_to.window(main_tab)
 
@@ -152,12 +143,11 @@ def open_h4_and_collect(driver, n: int = 1, wait_seconds: int = 10):
 
     return complaints_list
 
-#COleta as reclamações.
 def collect_complaints(target_company, complaint_number=6, wait_seconds=10):
     driver = open_company_page(target_company)
 
     try:
-        complaints_list = open_h4_and_collect(driver, complaint_number, wait_seconds)
+        complaints_list = open_and_collect(driver, complaint_number, wait_seconds)
     finally:
         driver.quit()
 
