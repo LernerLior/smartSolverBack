@@ -59,11 +59,7 @@ def run_main():
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/latest")
-def get_latest(n: int = 6):
-    """
-    Retorna os últimos n documentos gravados no Cosmos DB, ordenados por complaint_creation_date.
-    Retorna diretamente um array para o frontend consumir com .map()
-    """
+def get_latest(n: int = 6, page: int = 1):
     try:
         items = list(container.query_items(
             query="SELECT * FROM c",
@@ -75,12 +71,14 @@ def get_latest(n: int = 6):
 
         items_sorted = sorted(items, key=lambda x: x['parsed_date'], reverse=True)
 
-        latest_items = items_sorted[:n]
+        total = len(items_sorted)
+        start = (page - 1) * n
+        latest_items = items_sorted[start:start + n]
 
         for item in latest_items:
             item.pop('parsed_date', None)
 
-        return latest_items
+        return {"items": latest_items, "total": total, "page": page, "pages": -(-total // n)}
 
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
