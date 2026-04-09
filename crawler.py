@@ -55,7 +55,7 @@ def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
         title_elem = WebDriverWait(driver, wait_seconds).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "h1[data-testid='complaint-title']"))
         )
-        data['complaint-title'] = title_elem.text
+        data['complaint_title'] = title_elem.text
 
         human_scroll(driver)
 
@@ -63,7 +63,7 @@ def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
             date_container = driver.find_element(
                 By.XPATH, "//p[.//*[contains(@class,'lucide-calendar')]]"
             )
-            data['complaint-creation-date'] = driver.execute_script("""
+            data['complaint_creation_date'] = driver.execute_script("""
                 return Array.from(arguments[0].childNodes)
                     .filter(n => n.nodeType === Node.TEXT_NODE)
                     .map(n => n.textContent.trim())
@@ -71,13 +71,13 @@ def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
                     .join('');
             """, date_container)
         except:
-            data['complaint-creation-date'] = None
+            data['complaint_creation_date'] = None
 
         try:
             desc_elem = driver.find_element(By.CSS_SELECTOR, "p[data-testid='complaint-description']")
-            data['complaint-description'] = desc_elem.text
+            data['complaint_description'] = desc_elem.text
         except:
-            data['complaint-description'] = None
+            data['complaint_description'] = None
 
     except TimeoutException:
         return None
