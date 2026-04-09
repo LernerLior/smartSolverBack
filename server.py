@@ -61,24 +61,28 @@ def run_main():
 @app.get("/latest")
 def get_latest(n: int = 6, page: int = 1):
     try:
+        offset = (page - 1) * n
+
+        # Conta o total sem trazer os dados
+        count_query = "SELECT VALUE COUNT(1) FROM c"
+        total = list(container.query_items(
+            query=count_query,
+            enable_cross_partition_query=True
+        ))[0]
+
+        # Busca só a página necessária
+        query = f"SELECT * FROM c ORDER BY c.complaint_creation_date DESC OFFSET {offset} LIMIT {n}"
         items = list(container.query_items(
-            query="SELECT * FROM c",
+            query=query,
             enable_cross_partition_query=True
         ))
 
-        for item in items:
-            item['parsed_date'] = datetime.strptime(item['complaint_creation_date'], "%d/%m/%Y às %H:%M")
-
-        items_sorted = sorted(items, key=lambda x: x['parsed_date'], reverse=True)
-
-        total = len(items_sorted)
-        start = (page - 1) * n
-        latest_items = items_sorted[start:start + n]
-
-        for item in latest_items:
-            item.pop('parsed_date', None)
-
-        return {"items": latest_items, "total": total, "page": page, "pages": -(-total // n)}
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "pages": -(-total // n)
+        }
 
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
