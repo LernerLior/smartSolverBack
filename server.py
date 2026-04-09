@@ -145,4 +145,13 @@ def get_categories_by_date():
         }
         for date, cats in sorted(grouped.items())
     ]
+
+@app.get("/complaint/{id}")
+def get_complaint(id: str):
+    try:
+        item = container.read_item(item=id, partition_key="complaints")
+        return item
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=404)
+    
 #For testing: uvicorn server:app --reload --host 0.0.0.0 --port 8000
