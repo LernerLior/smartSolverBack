@@ -46,6 +46,7 @@ def run_main():
                                             "Conta Bloqueada", 
                                             "Resgate de Investimento Não Realizado", 
                                             "Problemas de atendimento",
+                                            "Problemas de conta",
                                             "Outros"])
         if isinstance(data, list):
             for item in data:
