@@ -113,7 +113,7 @@ def get_categories():
 @app.get("/complaint/{id}")
 def get_complaint(id: str):
     try:
-        item = container.read_item(item=id, partition_key="complaints")
+        item = container.read_item(item=id, partition_key="complaint")
         return item
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=404)
