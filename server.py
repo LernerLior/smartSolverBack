@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from google import genai
 from complaint_catgories import categorize_complaints
-
+from adjust_complaints import adjust_complaints
 # Carregar variáveis do .env
 load_dotenv()
 
@@ -52,6 +52,7 @@ def run_main():
         "Problemas de Atendimento",
         "Vítima de golpe",
         "Outros"])
+        data = adjust_complaints(data)
         if isinstance(data, list):
             for item in data:
                 container.upsert_item(item)
