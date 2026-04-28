@@ -85,63 +85,99 @@ def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
     return data
 
 COMPLAINT_LINK_SELECTOR = "a[data-testid='complaint-listagem-v2-title-link']"
+NEXT_PAGE_SELECTOR = "button[data-testid='next-page-navigation-button']"
+
+
+def go_to_next_page(driver, wait_seconds: int = 10) -> bool:
+    """Clica no botão de próxima página, se disponível e habilitado. Retorna True se navegou."""
+    try:
+        next_btn = WebDriverWait(driver, wait_seconds).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, NEXT_PAGE_SELECTOR))
+        )
+        if next_btn.is_enabled() and next_btn.is_displayed():
+            driver.execute_script("arguments[0].click();", next_btn)
+            human_sleep(2.0, 4.0)
+            WebDriverWait(driver, wait_seconds).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, COMPLAINT_LINK_SELECTOR))
+            )
+            return True
+        else:
+            print("Botão de próxima página desabilitado. Fim das páginas.")
+            return False
+    except TimeoutException:
+        print("Botão de próxima página não encontrado. Fim das páginas.")
+        return False
+
 
 def open_and_collect(driver, n: int = 1, wait_seconds: int = 10):
     complaints_list = []
     main_tab = driver.current_window_handle
+    collected = 0
+    page = 1
 
     WebDriverWait(driver, wait_seconds).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, COMPLAINT_LINK_SELECTOR))
     )
     human_scroll(driver)
 
-    for i in range(n):
-        try:
-            link_elements = WebDriverWait(driver, wait_seconds).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, COMPLAINT_LINK_SELECTOR))
-            )
+    while collected < n:
+        link_elements = WebDriverWait(driver, wait_seconds).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, COMPLAINT_LINK_SELECTOR))
+        )
 
-            if i >= len(link_elements):
-                print(f"Apenas {len(link_elements)} reclamações encontradas na página.")
+        hrefs = [el.get_attribute("href") for el in link_elements if el.get_attribute("href")]
+
+        if not hrefs:
+            print(f"Nenhum link encontrado na página {page}.")
+            break
+
+        for href in hrefs:
+            if collected >= n:
                 break
-
-            href = link_elements[i].get_attribute("href")
-
-            if not href:
-                print(f"[{i+1}/{n}] href não encontrado, pulando.")
-                continue
 
             human_sleep(1.0, 2.5)
 
-            driver.execute_script(f"window.open('{href}', '_blank');")
-            new_tab = [t for t in driver.window_handles if t != main_tab][0]
-            driver.switch_to.window(new_tab)
+            try:
+                driver.execute_script(f"window.open('{href}', '_blank');")
+                new_tab = [t for t in driver.window_handles if t != main_tab][0]
+                driver.switch_to.window(new_tab)
 
-            human_sleep(2.0, 4.0)
-            complaint_data = get_complaint_data(driver, wait_seconds=wait_seconds)
+                human_sleep(2.0, 4.0)
+                complaint_data = get_complaint_data(driver, wait_seconds=wait_seconds)
 
-            if complaint_data:
-                human_sleep(2.0, 5.0)
-                complaints_list.append(complaint_data)
-                print(f"[{i+1}/{n}] Coletado: {complaint_data.get('complaint-title', 'sem título')}")
+                if complaint_data:
+                    human_sleep(2.0, 5.0)
+                    complaints_list.append(complaint_data)
+                    collected += 1
+                    print(f"[{collected}/{n}] Coletado (pág. {page}): {complaint_data.get('complaint_title', 'sem título')}")
 
-            driver.close()
-            driver.switch_to.window(main_tab)
-
-            if random.random() < 0.3:
-                print(f"[{i+1}/{n}] Pausa longa...")
-                human_sleep(5.0, 10.0)
-            else:
-                human_sleep(1.5, 3.0)
-
-        except (TimeoutException, StaleElementReferenceException) as e:
-            print(f"[{i+1}/{n}] Erro, pulando: {e}")
-            if driver.current_window_handle != main_tab:
                 driver.close()
                 driver.switch_to.window(main_tab)
-            continue
+
+                if random.random() < 0.3:
+                    print(f"[{collected}/{n}] Pausa longa...")
+                    human_sleep(5.0, 10.0)
+                else:
+                    human_sleep(1.5, 3.0)
+
+            except (TimeoutException, StaleElementReferenceException) as e:
+                print(f"[{collected + 1}/{n}] Erro, pulando: {e}")
+                if driver.current_window_handle != main_tab:
+                    driver.close()
+                    driver.switch_to.window(main_tab)
+                continue
+
+        # Se ainda não coletou o suficiente, tenta ir para a próxima página
+        if collected < n:
+            print(f"Página {page} esgotada. Tentando ir para a próxima...")
+            if not go_to_next_page(driver, wait_seconds):
+                print("Sem mais páginas disponíveis.")
+                break
+            page += 1
+            human_scroll(driver)
 
     return complaints_list
+
 
 def collect_complaints(target_company, complaint_number=6, wait_seconds=10):
     driver = open_company_page(target_company)
