@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from google import genai
 from complaint_catgories import categorize_complaints
-from adjust_complaints import adjust_complaints
+
 # Carregar variáveis do .env
 load_dotenv()
 
@@ -35,7 +35,7 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],  
+    allow_origins=["http://localhost:5173"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,15 +44,14 @@ app.add_middleware(
 @app.post("/run-main")
 def run_main():
     try:
-        data = collect_complaints("santander", complaint_number=10, wait_seconds=10)
+        data = collect_complaints("santander", complaint_number=6, wait_seconds=10)
         data = categorize_complaints(data, ["Cobrança Indevida", 
-        "Problemas de Pagamento", 
-        "Conta Bloqueada", 
-        "Resgate de Investimento Não Realizado", 
-        "Problemas de Atendimento",
-        "Vítima de golpe",
-        "Outros"])
-        data = adjust_complaints(data)
+                                            "Problemas de Pagamento", 
+                                            "Conta Bloqueada", 
+                                            "Resgate de Investimento Não Realizado", 
+                                            "Problemas de Atendimento",
+                                            "Vítima de golpe",
+                                            "Outros"])
         if isinstance(data, list):
             for item in data:
                 container.upsert_item(item)
@@ -110,6 +109,26 @@ def get_categories():
         counts[cat] = counts.get(cat, 0) + 1
 
     return [{"category": k, "total": v} for k, v in counts.items()]
+
+@app.get("/origin")
+def get_origin():
+    query = """
+    SELECT c.complaint_origin AS origin
+    FROM c
+    """
+
+    items = list(container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    
+    counts = {}
+    for item in items:
+        origin = item.get("origin")
+        counts[origin] = counts.get(origin, 0) + 1
+
+    return [{"origin": k, "total": v} for k, v in counts.items()]
+
 
 @app.get("/complaint/{id}")
 def get_complaint(id: str):
