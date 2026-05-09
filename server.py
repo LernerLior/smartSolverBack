@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from crawler import collect_complaints
 from dotenv import load_dotenv
 import os
+import traceback
 from azure.cosmos import CosmosClient
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -60,6 +61,7 @@ def run_main():
 
         return JSONResponse({"status": "success", "data": data})
     except Exception as e:
+        print(traceback.format_exc())
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/latest")
