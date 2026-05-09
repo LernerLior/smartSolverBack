@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
+# DEBUG: mostra onde ficou o chromedriver
+RUN which chromedriver || find / -name "chromedriver" 2>/dev/null
 
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
