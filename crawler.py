@@ -26,10 +26,7 @@ def human_scroll(driver):
     driver.execute_script(f"window.scrollTo(0, {current - random.randint(100, 300)});")
     human_sleep(0.5, 1.2)
 
-
 def open_company_page(target_company: str):
-    chromedriver_autoinstaller.install()
-    
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
@@ -40,8 +37,9 @@ def open_company_page(target_company: str):
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option("useAutomationExtension", False)
+    chrome_options.binary_location = "/usr/bin/chromium"
 
-    service = Service(ChromeDriverManager().install())
+    service = Service("/usr/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
