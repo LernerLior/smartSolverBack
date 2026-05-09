@@ -28,13 +28,14 @@ def human_scroll(driver):
 
 def open_company_page(target_company: str):
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--disable-notifications")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option("useAutomationExtension", False)
     chrome_options.binary_location = "/usr/bin/chromium"
@@ -48,8 +49,13 @@ def open_company_page(target_company: str):
 
     url = f"https://www.reclameaqui.com.br/empresa/{target_company}/lista-reclamacoes/"
     driver.get(url)
-    human_sleep(2.0, 4.0)
 
+    # DEBUG - adiciona isso temporariamente
+    print(f"[DEBUG] Título: {driver.title}")
+    print(f"[DEBUG] URL: {driver.current_url}")
+    print(f"[DEBUG] HTML: {driver.page_source[:1000]}")
+
+    human_sleep(2.0, 4.0)
     return driver
 
 def get_complaint_data(driver, wait_seconds: int = 10) -> dict:
