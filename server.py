@@ -1,14 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from crawler import collect_complaints
 from dotenv import load_dotenv
 import os
 import traceback
 from azure.cosmos import CosmosClient
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timedelta
 from google import genai
 from complaint_catgories import categorize_complaints
+from pydantic import BaseModel, EmailStr
+import bcrypt
+from jose import JWTError, jwt
 
 # Carregar variáveis do .env
 load_dotenv()
@@ -24,6 +28,10 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 FRONTEND_URL = os.getenv("FRONTEND_URL")  
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
+LOGIN_KEY = os.getenv("LOGIN_KEY", "chave")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
+ 
 
 # Inicializar cliente do Cosmos
 client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
@@ -36,7 +44,7 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],  
+    allow_origins=["http://localhost:5173"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,7 +69,6 @@ def run_main():
 
         return JSONResponse({"status": "success", "data": data})
     except Exception as e:
-        print(traceback.format_exc())
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/latest")
@@ -220,4 +227,95 @@ async def ai_analysis(body: dict):
         print(f"OpenRouter também falhou: {e}")
         return JSONResponse({"status": "error", "message": "Ambos os modelos falharam."}, status_code=500)
 
-#For testing: uvicorn server:app --reload --host 0.0.0.0 --port 8000
+
+# Endpoints de login
+
+COSMOS_USERS_DATABASE = os.getenv("COSMOS_USERS_DATABASE")
+COSMOS_USERS_CONTAINER = os.getenv("COSMOS_USERS_CONTAINER", "users")
+
+users_database = client.get_database_client(COSMOS_USERS_DATABASE)
+users_container = users_database.get_container_client(COSMOS_USERS_CONTAINER)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    password: str
+ 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+ 
+def hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain[:72].encode(), bcrypt.gensalt()).decode()
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain[:72].encode(), hashed.encode())
+
+def validate_password_strength(password: str) -> None:
+    if len(password) < 8:
+        raise HTTPException(status_code=422, detail="A senha deve ter pelo menos 8 caracteres.")
+    if not any(c.isupper() for c in password):
+        raise HTTPException(status_code=422, detail="A senha deve conter pelo menos uma letra maiúscula.")
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=422, detail="A senha deve conter pelo menos um número.")
+ 
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, LOGIN_KEY, algorithm=ALGORITHM)
+ 
+def get_user_by_email(email: str):
+    query = f"SELECT * FROM c WHERE c.email = '{email}' AND c.type = 'user'"
+    items = list(users_container.query_items(query=query, enable_cross_partition_query=True))
+    return items[0] if items else None
+ 
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, LOGIN_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Token inválido.")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+    return user
+ 
+
+@app.post("/create_user", status_code=201, tags=["Auth"])
+def create_user(payload: CreateUserRequest):
+    """Cadastra um novo administrador."""
+    validate_password_strength(payload.password)
+
+    if get_user_by_email(payload.email):
+        raise HTTPException(status_code=409, detail="Este e-mail já está cadastrado.")
+
+    new_user = {
+        "id": payload.email,
+        "type": "user",
+        "email": payload.email,
+        "hashed_password": hash_password(payload.password),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    users_container.upsert_item(new_user)
+
+    return {"message": "Conta criada com sucesso.", "email": payload.email}
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+@app.post("/login_user", tags=["Auth"])
+def login_user(payload: LoginRequest):
+    """Autentica o usuário e retorna um JWT."""
+    user = get_user_by_email(payload.email)
+    if not user or not verify_password(payload.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+
+    token = create_access_token({"sub": user["email"]})
+    return {"access_token": token, "token_type": "bearer"}
+
+#For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
