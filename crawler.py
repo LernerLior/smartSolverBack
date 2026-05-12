@@ -1,14 +1,14 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+
 from selenium.webdriver.common.by import By
 import random
 import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
-import chromedriver_autoinstaller
+
 
 def human_sleep(min_s: float = 1.0, max_s: float = 3.0):
     time.sleep(random.uniform(min_s, max_s))
