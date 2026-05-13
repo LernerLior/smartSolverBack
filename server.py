@@ -318,4 +318,55 @@ def login_user(payload: LoginRequest):
     token = create_access_token({"sub": user["email"]})
     return {"access_token": token, "token_type": "bearer"}
 
+# Comentários:
+COSMOS_COMMENTS_CONTAINER = os.getenv("COSMOS_COMMENTS_CONTAINER", "comments")
+comments_container = users_database.get_container_client(COSMOS_COMMENTS_CONTAINER)
+
+class CommentPostRequest(BaseModel):
+    complaint_id: str
+    text: str
+
+class CommentDeleteRequest(BaseModel):
+    comment_id: str
+
+@app.post("/comments_post", status_code=201, tags=["Comments"])
+def post_comment(
+    payload: CommentPostRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cria um comentário vinculado a uma reclamação. Requer autenticação."""
+    import uuid
+
+    comment = {
+        "id": str(uuid.uuid4()),
+        "complaint_id": payload.complaint_id,
+        "text": payload.text,
+        "author_email": current_user["email"],
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    comments_container.upsert_item(comment)
+    return comment
+
+
+@app.delete("/comments_delete", tags=["Comments"])
+def delete_comment(
+    payload: CommentDeleteRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Deleta um comentário. Só o autor pode deletar o próprio comentário."""
+    query = f"SELECT * FROM c WHERE c.id = '{payload.comment_id}'"
+    items = list(comments_container.query_items(query=query, enable_cross_partition_query=True))
+
+    if not items:
+        raise HTTPException(status_code=404, detail="Comentário não encontrado.")
+
+    comment = items[0]
+
+    if comment["author_email"] != current_user["email"]:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para excluir este comentário.")
+
+    comments_container.delete_item(item=comment["id"], partition_key=comment["complaint_id"])
+    return {"message": "Comentário excluído com sucesso."}
+
+
 #For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
