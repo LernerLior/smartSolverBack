@@ -386,13 +386,33 @@ def get_comments(
     return items
 
 #Status (Concluído ou Pendente)
+COSMOS_COMPLETED_CONTAINER = os.getenv("COSMOS_COMPLETED_CONTAINER", "completed")
+completed_container = database.get_container_client(COSMOS_COMPLETED_CONTAINER)
+
 @app.patch("/complaint_status")
 def toggle_status(body: dict, current_user: dict = Depends(get_current_user)):
     try:
         item = container.read_item(item=body["complaint_id"], partition_key="complaint")
         item["complaint_status"] = body.get("status", False)
-        container.upsert_item(item)
+
+        if item["complaint_status"]:
+            completed_container.upsert_item(item)
+            container.delete_item(item=item["id"], partition_key="complaint")
+        else:
+            container.upsert_item(item)
+
         return {"complaint_status": item["complaint_status"]}
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@app.get("/solved")
+def get_solved(current_user: dict = Depends(get_current_user)):
+    try:
+        items = list(completed_container.query_items(
+            query="SELECT * FROM c",
+            enable_cross_partition_query=True
+        ))
+        return {"items": items}
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     
