@@ -368,5 +368,21 @@ def delete_comment(
     comments_container.delete_item(item=comment["id"], partition_key=comment["complaint_id"])
     return {"message": "Comentário excluído com sucesso."}
 
+@app.get("/comments_get", tags=["Comments"])
+def get_comments(
+    complaint_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Retorna todos os comentários vinculados a uma reclamação."""
+    query = f"SELECT * FROM c WHERE c.complaint_id = '{complaint_id}' ORDER BY c.created_at ASC"
+    items = list(comments_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+
+    for item in items:
+        item["text"] = item.get("text", "")
+
+    return items
 
 #For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
