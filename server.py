@@ -385,4 +385,15 @@ def get_comments(
 
     return items
 
+#Status (Concluído ou Pendente)
+@app.patch("/complaint_status")
+def toggle_status(body: dict, current_user: dict = Depends(get_current_user)):
+    try:
+        item = container.read_item(item=body["complaint_id"], partition_key="complaint")
+        item["complaint_status"] = body.get("status", False)
+        container.upsert_item(item)
+        return {"complaint_status": item["complaint_status"]}
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    
 #For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
