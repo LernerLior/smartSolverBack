@@ -418,41 +418,14 @@ def get_solved(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
-contacts_container = users_database.get_container_client(os.getenv("COSMOS_CONTACTS_CONTAINER", "contacts"))
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:5173")],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+COSMOS_CONTACTS_CONTAINER = os.getenv("COSMOS_CONTACTS_CONTAINER", "contacts")
+contacts_container = users_database.get_container_client(COSMOS_CONTACTS_CONTAINER)
 
 class ContactRequest(BaseModel):
     name: str
     email: EmailStr
     company: str = ""
     message: str
-
-@app.post("/contact", status_code=201)
-def save_contact(payload: ContactRequest):
-    try:
-        item = {
-            "id": str(uuid.uuid4()),
-            "type": "contact",
-            "name": payload.name,
-            "email": payload.email,
-            "company": payload.company,
-            "message": payload.message,
-            "created_at": datetime.utcnow().isoformat(),
-            "status": "pending",
-        }
-        contacts_container.upsert_item(item)
-        return {"message": "Contato salvo com sucesso.", "id": item["id"]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Não foi possível salvar o contato.")
 
 
 #For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
