@@ -427,5 +427,29 @@ class ContactRequest(BaseModel):
     company: str = ""
     message: str
 
+@app.post("/contact")
+def create_contact(payload: ContactRequest):
+    try:
+        contact = {
+            "id": str(uuid.uuid4()),
+            "name": payload.name,
+            "email": payload.email,
+            "company": payload.company,
+            "message": payload.message,
+            "created_at": datetime.utcnow().isoformat(),
+        }
 
+        contacts_container.upsert_item(contact)
+
+        return {
+            "status": "success",
+            "message": "Contato enviado com sucesso."
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            {"status": "error", "message": str(e)},
+            status_code=500
+        )
+    
 #For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
