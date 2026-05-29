@@ -13,7 +13,7 @@ from complaint_catgories import categorize_complaints
 from pydantic import BaseModel, EmailStr
 import bcrypt
 from jose import JWTError, jwt
-
+import uuid
 # Carregar variáveis do .env
 load_dotenv()
 
@@ -44,7 +44,7 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],  
+    allow_origins=["http://localhost:5173"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -186,7 +186,7 @@ def get_categories_by_date():
         }
         for date, cats in sorted(grouped.items())
     ]
-
+    
 @app.post("/ai-analysis")
 async def ai_analysis(body: dict):
     instruction = "Você é um assistente que ajuda a analisar dados de reclamações de clientes. Forneça insights úteis e sugestões de fácil entendimento com base nos dados fornecidos. Seja breve e preciso, mas apresente detalhes suficientes para que as recomendações possam ser implementadas, principalmente nas de maior importância"
@@ -415,5 +415,42 @@ def get_solved(current_user: dict = Depends(get_current_user)):
         return {"items": items}
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-    
+
+contacts_container = users_database.get_container_client(os.getenv("COSMOS_CONTACTS_CONTAINER", "contacts"))
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:5173")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class ContactRequest(BaseModel):
+    name: str
+    email: EmailStr
+    company: str = ""
+    message: str
+
+@app.post("/contact", status_code=201)
+def save_contact(payload: ContactRequest):
+    try:
+        item = {
+            "id": str(uuid.uuid4()),
+            "type": "contact",
+            "name": payload.name,
+            "email": payload.email,
+            "company": payload.company,
+            "message": payload.message,
+            "created_at": datetime.utcnow().isoformat(),
+            "status": "pending",
+        }
+        contacts_container.upsert_item(item)
+        return {"message": "Contato salvo com sucesso.", "id": item["id"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Não foi possível salvar o contato.")
+
+
 #For testing: python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
