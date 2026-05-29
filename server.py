@@ -26,12 +26,14 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview") 
 # URL do frontend permitido
 FRONTEND_URL = os.getenv("FRONTEND_URL")  
+LANDING_URL = os.getenv("LANDING_URL")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
 LOGIN_KEY = os.getenv("LOGIN_KEY", "chave")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
  
+LANDING_URL = os.getenv("LANDING_URL")
 
 # Inicializar cliente do Cosmos
 client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
@@ -44,7 +46,7 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],  
+    allow_origins=[FRONTEND_URL,LANDING_URL],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
